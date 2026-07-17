@@ -12,7 +12,10 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', port });
+    db.get("SELECT COUNT(*) as count FROM licenses", (err, row) => {
+        const count = (!err && row) ? row.count : -1;
+        res.json({ status: 'ok', port, licenses: count, dbError: err ? err.message : null });
+    });
 });
 
 // Initialize OpenAI
@@ -46,13 +49,22 @@ function initDb() {
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Seed default license if table is empty
+    // Create default license if table is empty
     db.get("SELECT COUNT(*) as count FROM licenses", (err, row) => {
-        if (!err && row.count === 0) {
+        if (err) {
+            console.error('Error checking licenses:', err.message);
+            return;
+        }
+        if (row.count === 0) {
             const licenseKey = process.env.DEFAULT_LICENSE_KEY || 'TEST-LICENSE-123';
             const shopUrl = process.env.DEFAULT_SHOP_URL || 'localhost';
-            db.run(`INSERT INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, shopUrl]);
-            console.log(`Created default license: ${licenseKey} for ${shopUrl}`);
+            db.run(`INSERT INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, shopUrl], function(err2) {
+                if (err2) {
+                    console.error('Error creating license:', err2.message);
+                } else {
+                    console.log(`Created default license: ${licenseKey} for ${shopUrl}`);
+                }
+            });
         }
     });
 }
