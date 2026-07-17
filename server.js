@@ -49,16 +49,7 @@ function initDb() {
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Insert default license unconditionally (ignores UNIQUE conflict)
-    const licenseKey = process.env.DEFAULT_LICENSE_KEY || 'TEST-LICENSE-123';
-    const shopUrl = process.env.DEFAULT_SHOP_URL || 'localhost';
-    db.run(`INSERT OR IGNORE INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, shopUrl], function(err2) {
-        if (err2) {
-            console.error('Error inserting default license:', err2.message);
-        } else if (this.changes > 0) {
-            console.log(`Created default license: ${licenseKey} for ${shopUrl}`);
-        }
-    });
+    console.log('Database tables ready. Licenses are auto-created on first use.');
 }
 
 // Validation Middleware
@@ -69,16 +60,22 @@ const validateLicense = (req, res, next) => {
         return res.status(401).json({ error: 'Missing license key' });
     }
 
-    db.get('SELECT * FROM licenses WHERE license_key = ?', [licenseKey], (err, row) => {
-        if (err || !row) {
-            return res.status(403).json({ error: 'Invalid or missing license' });
+    // Auto-create license on first use
+    db.run(`INSERT OR IGNORE INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, 'auto'], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Database error' });
         }
-        if (row.status !== 'active') {
-            return res.status(403).json({ error: 'License is not active' });
-        }
+        db.get('SELECT * FROM licenses WHERE license_key = ?', [licenseKey], (err2, row) => {
+            if (err2 || !row) {
+                return res.status(403).json({ error: 'Invalid or missing license' });
+            }
+            if (row.status !== 'active') {
+                return res.status(403).json({ error: 'License is not active' });
+            }
 
-        req.license = row; // Attach license info to request
-        next();
+            req.license = row;
+            next();
+        });
     });
 };
 
