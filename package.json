@@ -1,0 +1,22 @@
+{
+  "name": "scentmatch-saas-api",
+  "version": "1.0.0",
+  "description": "ScentMatch AI SaaS API - OpenAI proxy with license management",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "openai": "^6.25.0",
+    "sqlite3": "^5.1.7"
+  }
+}
