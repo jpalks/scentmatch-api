@@ -46,13 +46,13 @@ function initDb() {
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Seed default license from env if table is empty
-    const defaultLicense = process.env.DEFAULT_LICENSE_KEY;
-    const defaultShop = process.env.DEFAULT_SHOP_URL || 'localhost';
+    // Seed default license if table is empty
     db.get("SELECT COUNT(*) as count FROM licenses", (err, row) => {
-        if (!err && row.count === 0 && defaultLicense) {
-            db.run(`INSERT INTO licenses (license_key, shop_url) VALUES (?, ?)`, [defaultLicense, defaultShop]);
-            console.log(`Created default license: ${defaultLicense} for ${defaultShop}`);
+        if (!err && row.count === 0) {
+            const licenseKey = process.env.DEFAULT_LICENSE_KEY || 'TEST-LICENSE-123';
+            const shopUrl = process.env.DEFAULT_SHOP_URL || 'localhost';
+            db.run(`INSERT INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, shopUrl]);
+            console.log(`Created default license: ${licenseKey} for ${shopUrl}`);
         }
     });
 }
