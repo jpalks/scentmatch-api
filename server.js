@@ -154,7 +154,7 @@ app.post('/api/v1/map-products', validateLicense, async (req, res) => {
             return res.status(400).json({ error: 'Products array is required.' });
         }
 
-        const batchSize = 30;
+        const batchSize = 20;
         const results = [];
 
         for (let i = 0; i < products.length; i += batchSize) {
