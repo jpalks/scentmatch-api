@@ -146,6 +146,56 @@ app.post('/api/v1/chat', validateLicense, async (req, res) => {
     }
 });
 
+// AI Auto-Map Products Endpoint
+app.post('/api/v1/map-products', validateLicense, async (req, res) => {
+    try {
+        const { products } = req.body;
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            return res.status(400).json({ error: 'Products array is required.' });
+        }
+
+        const batchSize = 50;
+        const results = [];
+
+        for (let i = 0; i < products.length; i += batchSize) {
+            const batch = products.slice(i, i + batchSize);
+            const productList = batch.map((p, idx) => `${i + idx + 1}. "${p.title}"`).join('\n');
+
+            const prompt = `You are a perfume expert. Given these product names from an inspired perfume store, identify which famous original perfume each one is inspired by.
+
+Product names:
+${productList}
+
+Return ONLY a valid JSON array. No markdown, no code blocks, no explanation. Format:
+[{"product": "exact product name", "original": "famous original name"}]
+
+If you cannot determine the original, use "Unknown" as the original value.`;
+
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [{ role: "system", content: "You are a perfume expert. Return ONLY valid JSON arrays, no other text." }, { role: "user", content: prompt }],
+                temperature: 0.3,
+            });
+
+            const reply = completion.choices[0].message.content.trim();
+            try {
+                const parsed = JSON.parse(reply.replace(/```json|```/g, '').trim());
+                if (Array.isArray(parsed)) {
+                    results.push(...parsed);
+                }
+            } catch (e) {
+                console.error('Failed to parse AI response:', reply);
+            }
+        }
+
+        console.log(`Mapped ${results.length}/${products.length} products`);
+        res.json({ mapped: results, total: products.length });
+    } catch (error) {
+        console.error('Map Products Error:', error);
+        res.status(500).json({ error: 'Error mapping products.' });
+    }
+});
+
 // Start Server
 app.listen(port, '0.0.0.0', () => {
     console.log(`ScentMatch API Server running on port ${port} (listening on all interfaces)`);
