@@ -49,22 +49,14 @@ function initDb() {
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Create default license if table is empty
-    db.get("SELECT COUNT(*) as count FROM licenses", (err, row) => {
-        if (err) {
-            console.error('Error checking licenses:', err.message);
-            return;
-        }
-        if (row.count === 0) {
-            const licenseKey = process.env.DEFAULT_LICENSE_KEY || 'TEST-LICENSE-123';
-            const shopUrl = process.env.DEFAULT_SHOP_URL || 'localhost';
-            db.run(`INSERT INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, shopUrl], function(err2) {
-                if (err2) {
-                    console.error('Error creating license:', err2.message);
-                } else {
-                    console.log(`Created default license: ${licenseKey} for ${shopUrl}`);
-                }
-            });
+    // Insert default license unconditionally (ignores UNIQUE conflict)
+    const licenseKey = process.env.DEFAULT_LICENSE_KEY || 'TEST-LICENSE-123';
+    const shopUrl = process.env.DEFAULT_SHOP_URL || 'localhost';
+    db.run(`INSERT OR IGNORE INTO licenses (license_key, shop_url) VALUES (?, ?)`, [licenseKey, shopUrl], function(err2) {
+        if (err2) {
+            console.error('Error inserting default license:', err2.message);
+        } else if (this.changes > 0) {
+            console.log(`Created default license: ${licenseKey} for ${shopUrl}`);
         }
     });
 }
