@@ -166,17 +166,19 @@ app.post('/api/v1/map-products', validateLicense, async (req, res) => {
                 return entry;
             }).join('\n');
 
-            const prompt = `You are a perfume expert who knows every fragrance ever made. You are helping map inspired/type perfumes to their original famous counterparts.
+            const prompt = `You are a perfume expert who knows every fragrance ever made. You are helping map inspired/type perfumes to their famous original counterparts, or describe them if unknown.
 
 For each product below, identify the famous original perfume it is inspired by. Use the name, description, and category as clues.
 
 Products:
 ${productList}
 
-Return ONLY a valid JSON array. No markdown, no code blocks, no explanation. Example:
-[{"product": "exact product name", "original": "famous original name"}]
+Return ONLY a valid JSON array. No markdown, no code blocks, no explanation. Format:
+[{"product": "exact product name", "original": "famous original name OR leave empty if unknown"}]
 
-IMPORTANT: If you're not confident (less than 80% sure), use "Unknown" as original. Better Unknown than wrong.`;
+RULES:
+- If you are confident (80%+ sure) about the original → set "original" to the famous name
+- If you are NOT sure → set "original" to "" (empty string)`;
 
             const completion = await openai.chat.completions.create({
                 model: "gpt-4o-mini",
@@ -203,6 +205,63 @@ IMPORTANT: If you're not confident (less than 80% sure), use "Unknown" as origin
     } catch (error) {
         console.error('Map Products Error:', error);
         res.status(500).json({ error: 'Error mapping products.' });
+    }
+});
+
+// AI Fragrance Description Generator
+app.post('/api/v1/enhance-products', validateLicense, async (req, res) => {
+    try {
+        const { products } = req.body;
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            return res.status(400).json({ error: 'Products array is required.' });
+        }
+
+        const batchSize = 30;
+        const results = [];
+
+        for (let i = 0; i < products.length; i += batchSize) {
+            const batch = products.slice(i, i + batchSize);
+            const productList = batch.map((p, idx) => {
+                let entry = `${i + idx + 1}. "${p.title}"`;
+                if (p.category) entry += ` [Category: ${p.category}]`;
+                return entry;
+            }).join('\n');
+
+            const prompt = `You are a fragrance expert. For each product below, write a short description in Greek (1-2 sentences) describing its scent profile, perfume family, and personality. Be poetic but accurate.
+
+Products:
+${productList}
+
+Return ONLY a valid JSON array. No markdown, no code blocks, no explanation. Format:
+[{"product": "exact product name", "description": "scent description in Greek"}]
+
+Example: [{"product": "Zenith No. 1 - Éclipse Brillante", "description": "Ένα φρέσκο, φρουτώδες άρωμα με έντονες νότες ανανά, μαύρης σταφίδας και βερύκοκκου, με βάση από μόσχο και δρυ. Ιδανικό για δυναμικούς άνδρες που αγαπούν τις πολυτελείς μυρωδιές."}]`;
+
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: "You are a fragrance expert. Return ONLY valid JSON arrays." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.5,
+            });
+
+            const reply = completion.choices[0].message.content.trim();
+            try {
+                const parsed = JSON.parse(reply.replace(/```json|```/g, '').trim());
+                if (Array.isArray(parsed)) {
+                    results.push(...parsed);
+                }
+            } catch (e) {
+                console.error('Failed to parse AI response for enhancer batch', i, reply);
+            }
+        }
+
+        console.log(`Enhanced ${results.length}/${products.length} products`);
+        res.json({ enhanced: results, total: products.length });
+    } catch (error) {
+        console.error('Enhance Products Error:', error);
+        res.status(500).json({ error: 'Error enhancing products.' });
     }
 });
 
